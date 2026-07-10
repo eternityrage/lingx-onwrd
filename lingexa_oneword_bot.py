@@ -38,6 +38,22 @@ def gd(n=WPV):
         "descriptive and sensory words",
         "negative qualities and flaws",
         "positive qualities and virtues",
+        "nature and environment",
+        "technology and innovation",
+        "food and cooking",
+        "travel and adventure",
+        "art and creativity",
+        "science and discovery",
+        "business and finance",
+        "health and wellness",
+        "music and sound",
+        "sports and competition",
+        "relationships and communication",
+        "philosophy and wisdom",
+        "weather and seasons",
+        "animals and nature",
+        "architecture and design",
+        "fashion and style",
     ]
     c=[]
     for a in range(ca):
