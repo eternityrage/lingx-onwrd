@@ -30,14 +30,14 @@ def ah(ws):
 
 def gd(n=WPV):
     ca=20; cats=[
-        "people (bibliophile, misanthrope, philanthropist, connoisseur)",
-        "actions and behaviors (procrastinate, embellish, circumvent, scrutinize)",
-        "emotions and states (euphoria, melancholy, ennui, nostalgia)",
-        "character traits (stoic, gregarious, pugnacious, capricious)",
-        "intellectual (sophistry, pedantic, erudite, didactic)",
-        "descriptive words (ephemeral, ubiquitous, voracious, intrepid)",
-        "negative qualities (obsequious, pernicious, insidious, nefarious)",
-        "positive qualities (benevolent, magnanimous, altruistic, intrepid)",
+        "people and roles",
+        "actions and behaviors",
+        "emotions and states",
+        "character traits",
+        "intellectual and academic concepts",
+        "descriptive and sensory words",
+        "negative qualities and flaws",
+        "positive qualities and virtues",
     ]
     c=[]
     for a in range(ca):
