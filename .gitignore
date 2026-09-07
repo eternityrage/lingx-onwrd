@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+output/video/
+output/*.mp4
+output/*.jpg
+output/*.mp3
+output/upload_results_*.json
+!output/history/

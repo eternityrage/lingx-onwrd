@@ -70,7 +70,7 @@ def get_latest_reel():
             if key not in ("english", "transliteration", "category"):
                 lang_field = key
                 break
-    return {"video_path": str(latest), "metadata": meta, "category": meta.get("category_english", meta.get("channel", "Learning")), "phrases": phrases, "words": words, "lang_field": lang_field or "native"}
+    return {"video_path": str(latest), "metadata": meta, "category": meta.get("category_english", meta.get("channel", "Lingexa One Word")), "phrases": phrases, "words": words, "lang_field": lang_field or "native"}
 
 
 LANGUAGE_MAP = {
@@ -241,24 +241,43 @@ def generate_caption(phrases, category, lang_field="native", words=None, metadat
         base.extend(["#" + tag, "#history", "#ancienthistory", "#greekhistory", "#womenshistory"])
         return "\n".join(base)
     if words:
-        channel = category
+        channel = category or "Lingexa One Word"
         tag = channel.lower().replace(" ", "")
-        base = [f"{channel.upper()} - Unlock English Vocabulary!", "", f"Today's words:", ""]
+        base = [
+            f"🔥 {channel.upper()} — One Word Replaces A Whole Sentence!",
+            "",
+            "Stop using basic phrases. Level up your English vocabulary:",
+            ""
+        ]
         for i, w in enumerate(words[:3], 1):
-            word = w.get("word", "")
-            root = w.get("root", "")
-            root_m = w.get("root_meaning", "")
-            pos = w.get("part_of_speech", "")
-            definition = w.get("definition", "")
-            example = w.get("example", "")
-            base.append(f"{i}. {word.upper()} ({pos})")
-            base.append(f"   {definition}")
+            word = w.get("word", "").strip()
+            phrase = w.get("phrase", "").strip()
+            pos = w.get("part_of_speech", "").strip()
+            definition = w.get("definition", "").strip()
+            example = w.get("example", "").strip()
+            tip = w.get("tip", "").strip()
+            root = w.get("root", "").strip()
+            root_m = w.get("root_meaning", "").strip()
+
+            header = f"{i}. {word.upper()} ({pos})" if pos else f"{i}. {word.upper()}"
+            base.append(header)
+            if phrase:
+                base.append(f"   💡 Replaces: \"{phrase}\"")
+            if definition:
+                base.append(f"   📖 Meaning: {definition}")
             if root and root_m:
-                base.append(f"   Root: {root} = {root_m}")
-            base.append(f"   \"{example}\"")
+                base.append(f"   🌱 Root: {root} = {root_m}")
+            if example:
+                base.append(f"   ✍️ Example: \"{example}\"")
+            if tip:
+                base.append(f"   🧠 Tip: {tip}")
             base.append("")
-        base.extend(["Like & follow for daily vocabulary!", ""])
-        base.extend([f"#{tag}", f"#{tag}daily", "#vocabulary", "#englishlearning", "#wordroots", "#learnenglish"])
+        base.extend([
+            "Which word will you use today? Drop a comment! 👇",
+            "Save & share this reel to expand your daily vocabulary! ✨",
+            "",
+            f"#{tag}", "#vocabulary", "#englishvocabulary", "#powerwords", "#learnenglish", "#wordoftheday", "#speakbetter", "#englishlearning", "#smartwords"
+        ])
         return "\n".join(base)
     lang_name = get_language_name(phrases, lang_field)
     lang_tag = lang_name.lower().replace(" ", "")
@@ -283,10 +302,10 @@ def generate_caption(phrases, category, lang_field="native", words=None, metadat
 
 
 def upload_to_all_platforms(video_path, caption, category, phrases=None, lang_field="native", words=None, metadata=None):
-    lang_name = get_language_name(phrases or [], lang_field)
+    display_title = category if category else "Lingexa One Word"
     results = {"timestamp": datetime.now().isoformat(), "category": category, "video": video_path, "uploads": {}, "platforms_attempted": [], "platforms_successful": [], "platforms_skipped": [], "platforms_failed": [], "timing": {}, "phrase_source": detect_phrase_source(phrases) if phrases else "unknown"}
     print("\n" + "="*80)
-    print(f"VELOCITY {lang_name.upper()} - MULTI-PLATFORM UPLOAD")
+    print(f"{display_title.upper()} - MULTI-PLATFORM UPLOAD")
     print("="*80)
     if not Path(video_path).exists(): print(f"Video not found"); return results
     platforms = [("facebook", "fb", "Facebook"), ("instagram", "ig", "Instagram"), ("youtube", "yt", "YouTube"), ("vk", "vk", "VK"), ("telegram", "tg", "Telegram"), ("twitter", "tw", "Twitter"), ("threads", "th", "Threads"), ("tiktok", "tk", "TikTok")]
@@ -298,8 +317,15 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, lang_fi
                 t_start = datetime.now()
                 if pname == "youtube":
                     from upload_to_youtube import generate_video_metadata
-                    yt_title, yt_desc, yt_tags = generate_video_metadata(category, len(phrases) if phrases else 5, phrases)
-                    r = func(video_path=video_path, title=yt_title, description=yt_desc, tags=yt_tags, category_id='22')
+                    if words:
+                        yt_title, yt_desc, yt_tags = generate_video_metadata(words, metadata)
+                    elif phrases:
+                        yt_title, yt_desc, yt_tags = generate_video_metadata(phrases, metadata)
+                    else:
+                        yt_title = f"{category} - Lingexa One Word"
+                        yt_desc = caption
+                        yt_tags = ["vocabulary", "english", "lingexa"]
+                    r = func(video_path=video_path, title=yt_title, description=yt_desc, tags=yt_tags, category_id='27')
                 elif pname == "vk":
                     r = func(video_path=video_path, description=caption)
                 elif pname == "telegram":
@@ -330,6 +356,38 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, lang_fi
             results["platforms_skipped"].append(pname)
     s = len(results["platforms_successful"]); f = len(results["platforms_failed"]); sk = len(results["platforms_skipped"])
     print(f"\nSUMMARY: {s} success, {f} failed, {sk} skipped")
+
+    # Record to published_videos.json if any upload succeeded
+    if results.get("platforms_successful"):
+        try:
+            pub_file = Path("published_videos.json")
+            pub = []
+            if pub_file.exists():
+                try:
+                    with open(pub_file, "r", encoding="utf-8") as f: pub = json.load(f)
+                except Exception: pub = []
+            items_to_log = words if words else phrases
+            if items_to_log:
+                for item in items_to_log:
+                    w_name = item.get("word") if isinstance(item, dict) else str(item)
+                    if w_name:
+                        pub.append({
+                            "word": w_name.strip().lower(),
+                            "video": str(video_path),
+                            "time": datetime.now().isoformat()
+                        })
+            else:
+                pub.append({
+                    "video": str(video_path),
+                    "category": category,
+                    "time": datetime.now().isoformat()
+                })
+            with open(pub_file, "w", encoding="utf-8") as f:
+                json.dump(pub, f, indent=2, ensure_ascii=False)
+            print(f"[published] Updated published_videos.json with {len(items_to_log) if items_to_log else 1} entries")
+        except Exception as e:
+            print(f"[published] Notice: could not update published_videos.json: {e}")
+
     rf = Path("output") / f"upload_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     rf.parent.mkdir(exist_ok=True)
     with open(rf, "w", encoding="utf-8") as f: json.dump(results, f, indent=2, ensure_ascii=False)
@@ -338,7 +396,7 @@ def upload_to_all_platforms(video_path, caption, category, phrases=None, lang_fi
 
 def main():
     print("\n" + "="*80)
-    print("VELOCITY LANGUAGE - AUTOMATED UPLOAD")
+    print("LINGEXA ONE WORD - AUTOMATED UPLOAD")
     print("="*80)
     reel = get_latest_reel()
     if not reel: print("No reel found"); sys.exit(1)

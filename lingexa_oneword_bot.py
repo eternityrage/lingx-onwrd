@@ -3,103 +3,232 @@ Lingexa One Word - Powerful Vocabulary
 One word can replace a whole sentence
 """
 
-import os,sys,json,random,asyncio,subprocess
+import os,sys,json,random,asyncio,subprocess,time
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 if sys.platform=="win32": sys.stdout.reconfigure(encoding="utf-8")
 load_dotenv()
-P=os.getenv("POLLINATIONS_API_KEY"); M=os.getenv("AI_MODEL")
-if not M: raise ValueError("AI_MODEL not set!")
+P=os.getenv("POLLINATIONS_API_KEY", "")
+M=os.getenv("AI_MODEL", "gemini-fast")
 B=Path(__file__).parent; O=B/"output"; V=O/"video"; H=O/"history"
 for d in[O,V,H]: d.mkdir(exist_ok=True)
 W=1080; H2=1920; F=30; TV="en-US-GuyNeural"; CN="Lingexa One Word"; WPV=3; HF=H/"all_words.json"; FD=B/"fonts"
 
 def lh():
-    if HF.exists(): return json.load(open(HF,"r",encoding="utf-8"))
+    if HF.exists():
+        try: return json.load(open(HF,"r",encoding="utf-8"))
+        except Exception: return {"words":[],"last_updated":None}
     return {"words":[],"last_updated":None}
+
 def sh(d):
     d["last_updated"]=datetime.now().isoformat(); json.dump(d,open(HF,"w",encoding="utf-8"),indent=2,ensure_ascii=False)
+
 def iu(w):
-    h=lh(); return w.lower().strip() in[x.lower().strip() for x in h.get("words",[])]
+    h=lh(); return w.lower().strip() in[x.lower().strip() for x in h.get("words",[]) if x]
+
 def ah(ws):
-    h=lh(); e=[x.lower().strip() for x in h.get("words",[])]
+    h=lh(); e=[x.lower().strip() for x in h.get("words",[]) if x]
     for w in ws:
-        if w.lower().strip() not in e: h["words"].append(w.lower().strip()); e.append(w.lower().strip())
+        clean = w.lower().strip()
+        if clean and clean not in e:
+            h["words"].append(clean)
+            e.append(clean)
     sh(h)
 
+# Diverse curated vocabulary bank as a 100% reliable fallback
+FALLBACK_VOCABULARY = [
+    {"word": "ineffable", "part_of_speech": "adjective", "phrase": "too wonderful to be expressed in words", "definition": "too great or extreme to be expressed", "example": "The sunset filled her with ineffable joy.", "tip": "In- (not) + effable (speakable) - cannot speak it."},
+    {"word": "serendipity", "part_of_speech": "noun", "phrase": "finding good things without looking", "definition": "fortunate discovery made by chance", "example": "Finding this book was pure serendipity.", "tip": "From Persian fairy tale 'Three Princes of Serendip'."},
+    {"word": "ephemeral", "part_of_speech": "adjective", "phrase": "lasting for only a very short time", "definition": "lasting for a very short time", "example": "Cherry blossoms are famously ephemeral.", "tip": "Epi- (upon) + hemera (day) - lasting just a day."},
+    {"word": "mellifluous", "part_of_speech": "adjective", "phrase": "sweet and pleasant to hear", "definition": "sweet or musical; pleasant to hear", "example": "She had a rich, mellifluous singing voice.", "tip": "Melli- (honey) + fluous (flowing) - honey-flowing."},
+    {"word": "quixotic", "part_of_speech": "adjective", "phrase": "unrealistically idealistic and impractical", "definition": "exceedingly idealistic and unrealistic", "example": "He launched a quixotic quest to fix everything.", "tip": "Inspired by Don Quixote tilting at windmills."},
+    {"word": "verisimilitude", "part_of_speech": "noun", "phrase": "the appearance of being true or real", "definition": "the appearance of being real or truthful", "example": "The historical novel lacked verisimilitude.", "tip": "Veri (truth) + similitude (similarity) - like truth."},
+    {"word": "alacrity", "part_of_speech": "noun", "phrase": "cheerful and eager readiness to act", "definition": "brisk and cheerful readiness", "example": "She accepted the promotion with joyful alacrity.", "tip": "Think 'alert' and 'active' readiness."},
+    {"word": "ebullient", "part_of_speech": "adjective", "phrase": "overflowing with cheerful enthusiasm", "definition": "cheerful, lively, and full of energy", "example": "The crowd was in an ebullient mood tonight.", "tip": "Latin ebullire (to boil over with joy)."},
+    {"word": "fastidious", "part_of_speech": "adjective", "phrase": "paying excessive attention to every detail", "definition": "very attentive to accuracy and detail", "example": "He was fastidious about keeping his desk tidy.", "tip": "Think 'fussy' and 'tidy' combined."},
+    {"word": "grandiloquent", "part_of_speech": "adjective", "phrase": "using pompous and extravagant language", "definition": "pompous or extravagant in language", "example": "His grandiloquent speech bored the entire audience.", "tip": "Grand (large) + loqui (to speak) - big talk."},
+    {"word": "halcyon", "part_of_speech": "adjective", "phrase": "peaceful, idyllic, and deeply happy", "definition": "denoting a period of idyllic calm and peace", "example": "He recalled the halcyon days of his youth.", "tip": "Ancient myth of kingfisher calming storm waters."},
+    {"word": "insouciant", "part_of_speech": "adjective", "phrase": "showing a casual lack of worry", "definition": "showing a casual lack of concern; indifferent", "example": "She gave an insouciant shrug and smiled.", "tip": "In- (not) + souci (worry in French) - worry-free."},
+    {"word": "juxtapose", "part_of_speech": "verb", "phrase": "place together to highlight contrasts", "definition": "place side by side to compare contrasts", "example": "The artist juxtaposed ancient and modern styles.", "tip": "Juxta (next to) + pose (place) - place beside."},
+    {"word": "kaleidoscopic", "part_of_speech": "adjective", "phrase": "continually shifting in patterns and colors", "definition": "constantly changing in pattern or composition", "example": "The city presented a kaleidoscopic array of sights.", "tip": "Like looking through a turning kaleidoscope."},
+    {"word": "laconic", "part_of_speech": "adjective", "phrase": "using very few words to explain", "definition": "using very few words to express much", "example": "His laconic reply was simply: 'No.'", "tip": "Spartans of Laconia spoke with extreme brevity."},
+    {"word": "munificent", "part_of_speech": "adjective", "phrase": "larger or more generous than usual", "definition": "more generous than is usual or necessary", "example": "A munificent donor funded the entire shelter.", "tip": "Munus (gift) + facere (to make) - gift-maker."},
+    {"word": "nefarious", "part_of_speech": "adjective", "phrase": "wicked, criminal, and devoid of morals", "definition": "wicked, villainous, or criminal", "example": "They uncovered a nefarious plot against the city.", "tip": "Latin nefas (crime against divine law)."},
+    {"word": "obstreperous", "part_of_speech": "adjective", "phrase": "noisy and difficult to control", "definition": "noisy and difficult to control; unruly", "example": "The obstreperous children refused to sit down.", "tip": "Ob- (against) + strepere (to make noise)."},
+    {"word": "panacea", "part_of_speech": "noun", "phrase": "a solution or remedy for all troubles", "definition": "a solution or remedy for all difficulties", "example": "Technology is helpful but not a panacea.", "tip": "Pan (all) + akos (cure) - all-curing remedy."},
+    {"word": "querulous", "part_of_speech": "adjective", "phrase": "complaining in a petulant or whining manner", "definition": "complaining in a petulant or whining manner", "example": "She answered with a tired, querulous tone.", "tip": "From Latin queri (to complain like a quarrel)."},
+    {"word": "resplendent", "part_of_speech": "adjective", "phrase": "attractive and impressive through richness", "definition": "attractive and impressive through rich brilliance", "example": "She looked resplendent in her velvet gown.", "tip": "Re- + splendere (to shine with splendor)."},
+    {"word": "sagacity", "part_of_speech": "noun", "phrase": "the ability to make good judgments", "definition": "the quality of being wise and insightful", "example": "The elder was revered for her quiet sagacity.", "tip": "Think of a 'sage' having true vision."},
+    {"word": "taciturn", "part_of_speech": "adjective", "phrase": "reserved and saying very little", "definition": "reserved or uncommunicative in speech", "example": "The detective remained taciturn and watchful.", "tip": "Latin tacere (to be silent) - quiet by nature."},
+    {"word": "ubiquitous", "part_of_speech": "adjective", "phrase": "present, appearing, or found everywhere", "definition": "present, appearing, or found everywhere", "example": "Smartphones have become truly ubiquitous.", "tip": "Latin ubique (everywhere) - seen everywhere."},
+    {"word": "vacillate", "part_of_speech": "verb", "phrase": "waver between different opinions or actions", "definition": "waver between different opinions or decisions", "example": "He vacillated between accepting or declining.", "tip": "Imagine an unsteady pendulum swinging back and forth."},
+    {"word": "winsome", "part_of_speech": "adjective", "phrase": "attractive or appealing in character", "definition": "attractive or appealing in a fresh, charming way", "example": "She won everyone over with a winsome smile.", "tip": "Win + some - naturally wins affection."},
+    {"word": "xenial", "part_of_speech": "adjective", "phrase": "warm and hospitable to strangers", "definition": "hospitable to strangers or guests", "example": "They offered a xenial welcome to the traveler.", "tip": "From Greek xenos (guest/stranger) + hospitality."},
+    {"word": "yearning", "part_of_speech": "noun", "phrase": "a feeling of intense longing for something", "definition": "a feeling of intense longing for something", "example": "He felt a deep yearning for his homeland.", "tip": "Deep longing that pulls from within."},
+    {"word": "zephyr", "part_of_speech": "noun", "phrase": "a gentle, mild, and refreshing breeze", "definition": "a soft, gentle, and mild breeze", "example": "A cool zephyr rustled through the evening leaves.", "tip": "From Zephyros, Greek god of the west wind."},
+    {"word": "solipsism", "part_of_speech": "noun", "phrase": "the idea that only one's self exists", "definition": "the philosophical theory that only self exists", "example": "His self-obsession bordered on solipsism.", "tip": "Solus (alone) + ipse (self) - only self is real."},
+    {"word": "redolent", "part_of_speech": "adjective", "phrase": "strongly reminiscent or suggestive of something", "definition": "strongly suggestive or evocative of something", "example": "The kitchen was redolent of fresh cinnamon.", "tip": "Re- (again) + olere (to smell) - evokes scent."},
+    {"word": "perspicuous", "part_of_speech": "adjective", "phrase": "clearly expressed and easily understood", "definition": "clearly expressed and easily understood; lucid", "example": "Her explanation was admirably perspicuous.", "tip": "Per- (thoroughly) + spicere (to look) - easily seen."},
+    {"word": "limerence", "part_of_speech": "noun", "phrase": "an involuntary state of romantic infatuation", "definition": "the state of being obsessively infatuated", "example": "What he thought was love was only limerence.", "tip": "Coined in psychology for all-consuming infatuation."},
+    {"word": "chimerical", "part_of_speech": "adjective", "phrase": "wildly fanciful and highly unrealistic", "definition": "existing only as product of unchecked imagination", "example": "Investing all savings was a chimerical scheme.", "tip": "From Chimera, a mythical fire-breathing hybrid monster."},
+    {"word": "defenestration", "part_of_speech": "noun", "phrase": "the act of throwing someone out a window", "definition": "the action of throwing someone out of a window", "example": "The historic rebellion began with a defenestration.", "tip": "De- (out of) + fenestra (window in Latin)."},
+    {"word": "apocryphal", "part_of_speech": "adjective", "phrase": "widely circulated but of doubtful authenticity", "definition": "of doubtful authenticity, although widely circulated", "example": "The tale of the falling apple is apocryphal.", "tip": "Apo- (away) + kryptein (to hide) - obscure origins."},
+    {"word": "lugubrious", "part_of_speech": "adjective", "phrase": "looking or sounding excessively sad and gloomy", "definition": "looking or sounding mournful and dismal", "example": "He wore a lugubrious expression all morning.", "tip": "Latin lugere (to mourn) - gloomy and dismal."}
+]
+
 def gd(n=WPV):
-    ca=20; cats=[
-        "people and roles",
-        "actions and behaviors",
-        "emotions and states",
-        "character traits",
-        "intellectual and academic concepts",
-        "descriptive and sensory words",
-        "negative qualities and flaws",
-        "positive qualities and virtues",
-        "nature and environment",
-        "technology and innovation",
-        "food and cooking",
-        "travel and adventure",
-        "art and creativity",
-        "science and discovery",
-        "business and finance",
-        "health and wellness",
-        "music and sound",
-        "sports and competition",
-        "relationships and communication",
-        "philosophy and wisdom",
-        "weather and seasons",
-        "animals and nature",
-        "architecture and design",
-        "fashion and style",
+    ca=30
+    cats=[
+        "rare and intense emotional states",
+        "character virtues, honor, and inner strength",
+        "character flaws, arrogance, and human folly",
+        "profound philosophical and existential ideas",
+        "brilliant intellectual and academic concepts",
+        "vivid sensory, atmospheric, and descriptive words",
+        "masterful communication, rhetoric, and debate",
+        "bold actions, decisive moves, and transformations",
+        "leadership, authority, vision, and governance",
+        "artistic brilliance, aesthetics, and creativity",
+        "mysterious, ethereal, and enigmatic phenomena",
+        "science, cosmic discoveries, and universal laws",
+        "nature, wild landscapes, and elemental forces",
+        "technology, future paradigms, and invention",
+        "time, memory, nostalgia, and impermanence",
+        "resilience, perseverance, and grit",
+        "social dynamics, charisma, and diplomacy",
+        "perception, cognition, and sharp awareness",
+        "curiosity, wanderlust, and bold exploration",
+        "tranquility, serenity, and mindful presence",
+        "contrast, paradox, and subtle duality",
+        "elegance, refinement, and sophistication",
+        "courage, daring, and heroic feats",
+        "ambition, mastery, and relentless pursuit"
     ]
-    c=[]
+    # Shuffle categories to ensure fresh themes on every single run
+    random_cats = cats.copy()
+    random.shuffle(random_cats)
+
+    h = lh()
+    history_words = [x.lower().strip() for x in h.get("words",[]) if x and x.strip()]
+    all_used = set(history_words)
+    print(f"[history] Loaded {len(all_used)} previously used words")
+
+    c = []
     for a in range(ca):
         try:
             import requests
-            u="https://gen.pollinations.ai/v1/chat/completions"
-            hd={"Authorization":f"Bearer {P}","Content-Type":"application/json"}
-            cat=cats[a%len(cats)]; r=n-len(c); print(f"[api] Attempt {a+1}: {cat[:50]}... (need {r} more)")
-            h=lh(); ua=set(h.get("words",[])[-50:]); ua.update([x["word"].lower() for x in c]); us=", ".join(list(ua)[-30:]) if ua else "(none)"
-            p=f"""Generate 15 powerful single-word vocabulary words from: {cat}
+            u = "https://gen.pollinations.ai/v1/chat/completions"
+            hd = {"Content-Type": "application/json"}
+            if P:
+                hd["Authorization"] = f"Bearer {P}"
 
-NEVER repeat: {us}
-Each word should replace a LONG PHRASE. The word should be POWERFUL and USEFUL.
+            cat = random_cats[a % len(random_cats)]
+            r = n - len(c)
+            print(f"[api] Attempt {a+1}: {cat[:50]}... (need {r} more)")
 
-Return ONLY JSON array.
+            # Select a fresh mix of recent and sampled past words for the LLM avoid list
+            recent_avoid = history_words[-50:]
+            sampled_avoid = random.sample(history_words, min(30, len(history_words))) if history_words else []
+            avoid_list = list(dict.fromkeys(recent_avoid + sampled_avoid + [x["word"].lower() for x in c]))
+            us = ", ".join(avoid_list[-60:]) if avoid_list else "(none)"
 
-Format per item:
-[{{"word":"bibliophile","phrase":"a person who loves books","definition":"a person who collects or loves books","example":"She is a true bibliophile with thousands of books.","tip":"Biblio = book, phile = lover. Think 'library' + 'philosophy'."}}]
+            p = f"""Generate 15 powerful, sophisticated single-word English vocabulary words from category: {cat}.
+
+CRITICAL ANTI-REPETITION RULES:
+- NEVER repeat or suggest any of these previously used words: {us}
+- Do NOT pick basic, common, or cliché words (e.g. happy, sad, angry, tyrant, leader, procrastinate, bibliophile, demagogue, autocrat, maverick).
+- Every word must be a powerful, high-level English word that can replace a whole sentence or long phrase.
+
+Return ONLY a valid JSON array of objects.
+
+JSON schema per item:
+[
+  {{
+    "word": "effulgent",
+    "part_of_speech": "adjective",
+    "phrase": "shining brightly and radiating light",
+    "definition": "shining forth brilliantly or radiant",
+    "example": "Her effulgent smile lit up the entire hall.",
+    "tip": "Latin effulgere - to shine out like sunlight."
+  }}
+]
 
 REQUIREMENTS:
-- 'word': one powerful word
-- 'phrase': the longer phrase it replaces (max 8 words)
-- 'definition': simple definition (max 10 words)
-- 'example': example sentence (max 10 words)
-- 'tip': memory trick in ONE short sentence
-Return ONLY the JSON array.""" 
-            payload={"model":M,"messages":[{"role":"system","content":"Return ONLY valid JSON arrays."},{"role":"user","content":p}],"temperature":1.3}
-            resp=requests.post(u,headers=hd,json=payload,timeout=60); resp.raise_for_status()
-            ct=resp.json()["choices"][0]["message"]["content"].strip()
-            if "```json" in ct: ct=ct.split("```json")[1].split("```")[0].strip()
-            elif "```" in ct: ct=ct.split("```")[1].split("```")[0].strip()
-            it=json.loads(ct)
-            if not isinstance(it,list): raise ValueError("Not a list")
-            fr=[]
+- 'word': exactly ONE powerful English word (letters only, no spaces or hyphens)
+- 'part_of_speech': noun, verb, or adjective
+- 'phrase': the longer phrase it replaces (max 7 words)
+- 'definition': simple, clear definition (max 10 words)
+- 'example': example sentence (max 12 words)
+- 'tip': memory trick or word root in ONE short sentence (max 12 words)
+Return ONLY the raw JSON array."""
+
+            payload = {
+                "model": M or "gemini-fast",
+                "messages": [
+                    {"role": "system", "content": "You are a master English lexicographer. Return ONLY valid JSON arrays of unique vocabulary."},
+                    {"role": "user", "content": p}
+                ],
+                "temperature": 1.25
+            }
+            resp = requests.post(u, headers=hd, json=payload, timeout=60)
+            resp.raise_for_status()
+            ct = resp.json()["choices"][0]["message"]["content"].strip()
+            if "```json" in ct:
+                ct = ct.split("```json")[1].split("```")[0].strip()
+            elif "```" in ct:
+                ct = ct.split("```")[1].split("```")[0].strip()
+            it = json.loads(ct)
+            if not isinstance(it, list):
+                raise ValueError("Response is not a list")
+
+            fr = []
             for itm in it:
-                w=itm.get("word","").strip()
-                if not w: continue
-                if len(w.split())>1: continue
-                if w.lower() in ua: continue
-                fr.append(itm); ua.add(w.lower())
-                if len(c)+len(fr)>=n: break
+                raw_w = itm.get("word", "").strip()
+                if not raw_w or len(raw_w.split()) > 1:
+                    continue
+                w_clean = "".join(ch for ch in raw_w.lower() if ch.isalpha())
+                if not w_clean or len(w_clean) < 3:
+                    continue
+                if w_clean in all_used:
+                    print(f"  [dedup] Skipping already used word: '{w_clean}'")
+                    continue
+
+                itm["word"] = w_clean
+                fr.append(itm)
+                all_used.add(w_clean)
+                if len(c) + len(fr) >= n:
+                    break
+
             c.extend(fr)
-            if len(c)>=n: ah([m["word"] for m in c[:n]]); return c[:n]
-        except Exception as e: print(f"[api] Attempt {a+1} FAILED: {e}")
-    if c: ah([m["word"] for m in c]); return c
-    raise RuntimeError("API failed")
+            if len(c) >= n:
+                chosen = c[:n]
+                ah([m["word"] for m in chosen])
+                return chosen
+        except Exception as e:
+            print(f"[api] Attempt {a+1} FAILED: {e}")
+            time.sleep(1.5)
+
+    # Robust fallback: use curated bank if API could not fulfill all words
+    if len(c) < n:
+        print("[fallback] Checking curated vocabulary bank for unused words...")
+        shuffled_fallbacks = FALLBACK_VOCABULARY.copy()
+        random.shuffle(shuffled_fallbacks)
+        for fb in shuffled_fallbacks:
+            w_clean = fb["word"].lower().strip()
+            if w_clean not in all_used:
+                c.append(fb)
+                all_used.add(w_clean)
+                print(f"  [fallback] Added unused curated word: '{w_clean}'")
+                if len(c) >= n:
+                    break
+
+    if c:
+        chosen = c[:n]
+        ah([m["word"] for m in chosen])
+        return chosen
+
+    raise RuntimeError("Failed to generate vocabulary even with fallback bank")
 
 def bg():
     from PIL import Image,ImageDraw
