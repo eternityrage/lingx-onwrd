@@ -3,7 +3,7 @@ Lingexa One Word - Powerful Vocabulary
 One word can replace a whole sentence
 """
 
-import os,sys,json,random,asyncio,subprocess,time
+import os,sys,json,random,asyncio,subprocess,time,math
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -14,6 +14,39 @@ M=os.getenv("AI_MODEL", "gemini-fast")
 B=Path(__file__).parent; O=B/"output"; V=O/"video"; H=O/"history"
 for d in[O,V,H]: d.mkdir(exist_ok=True)
 W=1080; H2=1920; F=30; TV="en-US-GuyNeural"; CN="Lingexa One Word"; WPV=3; HF=H/"all_words.json"; FD=B/"fonts"
+
+FB = [
+    "C:/Windows/Fonts/segoeuib.ttf",
+    "C:/Windows/Fonts/arialbd.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+]
+FR = [
+    "C:/Windows/Fonts/segoeui.ttf",
+    "C:/Windows/Fonts/arial.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+]
+FI = [
+    "C:/Windows/Fonts/segoeuii.ttf",
+    "C:/Windows/Fonts/ariali.ttf",
+    "C:/Windows/Fonts/georgiai.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Italic.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"
+]
+
+def lf(font_list, sz):
+    from PIL import ImageFont
+    for fp in font_list:
+        try:
+            return ImageFont.truetype(fp, sz)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
 
 def lh():
     if HF.exists():
@@ -231,13 +264,24 @@ Return ONLY the raw JSON array."""
     raise RuntimeError("Failed to generate vocabulary even with fallback bank")
 
 def bg():
-    from PIL import Image,ImageDraw
-    img=Image.new('RGB',(W,H2)); d=ImageDraw.Draw(img)
+    from PIL import Image, ImageDraw
+    img = Image.new('RGB', (W, H2), (12, 14, 22))
+    d = ImageDraw.Draw(img)
     for y in range(H2):
-        r=y/H2
-        if r<0.5: rgb=(252,250,248)
-        else: rgb=(int(252+(248-252)*(r-0.5)*2),int(250+(246-250)*(r-0.5)*2),int(248+(244-248)*(r-0.5)*2))
-        d.rectangle([(0,y),(W,y+1)],fill=rgb)
+        ratio = y / H2
+        r = int(12 + 12 * math.sin(ratio * math.pi))
+        g = int(15 + 15 * math.sin(ratio * math.pi))
+        b = int(24 + 32 * math.sin(ratio * math.pi))
+        d.line([(0, y), (W, y)], fill=(r, g, b))
+
+    # Glow sphere in upper-middle
+    glow = Image.new("RGBA", (W, H2), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    cx, cy = W // 2, 600
+    for rad in range(400, 50, -25):
+        alpha = int(18 * (1 - rad / 400))
+        gd.ellipse([(cx - rad, cy - rad), (cx + rad, cy + rad)], fill=(212, 175, 55, alpha))
+    img = Image.alpha_composite(img.convert("RGBA"), glow).convert("RGB")
     return img
 
 async def ga(t,v,p):
@@ -283,92 +327,161 @@ def cfa(af,of):
     if cl.exists(): cl.unlink()
     return Path(of).exists() and Path(of).stat().st_size>100
 
-def wt(d,text,font,mw):
-    w=text.split(); l=[]; c=[]
-    for wd in w:
-        t=' '.join(c+[wd])
-        if d.textbbox((0,0),t,font=font)[2]<=mw or not c: c.append(wd)
-        else: l.append(' '.join(c)); c=[wd]
-    if c: l.append(' '.join(c))
-    return l
+def wt(d, text, font, mw):
+    words = str(text).split()
+    lines = []
+    curr = []
+    for wd in words:
+        test = ' '.join(curr + [wd])
+        bbox = d.textbbox((0, 0), test, font=font)
+        if (bbox[2] - bbox[0]) <= mw or not curr:
+            curr.append(wd)
+        else:
+            lines.append(' '.join(curr))
+            curr = [wd]
+    if curr:
+        lines.append(' '.join(curr))
+    return lines
 
-def gi(it,bg,op):
-    from PIL import Image,ImageDraw,ImageFont
-    img=bg.copy().convert('RGBA'); d=ImageDraw.Draw(img)
-    MX=90; CX=W//2; CW=W-MX*2
-    FB=["/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf","/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","C:/Windows/Fonts/arialbd.ttf","C:/Windows/Fonts/segoeuib.ttf"]
-    FR=["/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf","/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf","C:/Windows/Fonts/arial.ttf","C:/Windows/Fonts/segoeui.ttf"]
-    def lf(p,sz):
-        for pp in p:
-            try: f=ImageFont.truetype(pp,sz); return f
-            except: continue
-        return ImageFont.load_default()
-    fh=lf(FB,65); fw=lf(FB,130); fb=lf(FB,36); fp=lf(FB,55)
-    fdl=lf(FB,42); fd=lf(FR,60); fel=lf(FB,42); fe=lf(FR,50)
-    ftl=lf(FB,40); ft=lf(FR,44); ff=lf(FB,42)
+def gi(it, bg_img, op):
+    from PIL import Image, ImageDraw
+    img = bg_img.copy()
+    d = ImageDraw.Draw(img)
 
-    w=it["word"].upper(); ph=it.get("phrase",""); df=it.get("definition",""); ex=it.get("example",""); tp=it.get("tip","")
-    H=(45,35,65); W2=(25,20,45); L=(80,65,105); DB=(65,50,95); EB=(95,80,125); F2=(45,35,65)
+    MX = 75
+    CW = W - MX * 2
+    CX = W // 2
 
-    d.rectangle([(0,0),(W,90)],fill=H)
-    d.text((CX,45),CN.upper(),fill=(255,255,255),font=fh,anchor="mm")
+    f_brand = lf(FB, 34)
+    f_sub = lf(FB, 32)
+    f_lbl = lf(FB, 34)
+    f_body = lf(FR, 50)
+    f_quote = lf(FI, 46)
+    f_tip = lf(FR, 44)
+    f_foot = lf(FR, 32)
 
-    y=260
-    mww=CW; wfs=130; wf=lf(FB,wfs); ww=d.textbbox((0,0),w,font=wf)[2]
-    while ww>mww and wfs>40: wfs-=5; wf=lf(FB,wfs); ww=d.textbbox((0,0),w,font=wf)[2]
-    wh=d.textbbox((0,0),"Ay",font=wf)[3]-d.textbbox((0,0),"Ay",font=wf)[1]
-    d.text((CX,y+wh//2),w,fill=W2,font=wf,anchor="mm",stroke_width=max(1,wfs//40),stroke_fill=(220,215,220))
-    y+=wh+50
+    # 1. Header Brand Pill
+    y = 110
+    brand_txt = "LINGEXA  •  POWER VOCABULARY"
+    bb = d.textbbox((0, 0), brand_txt, font=f_brand)
+    bw, bh = bb[2] - bb[0], bb[3] - bb[1]
+    px, py = 32, 16
+    d.rounded_rectangle([(CX - bw // 2 - px, y), (CX + bw // 2 + px, y + bh + py * 2)], radius=25, fill=(28, 33, 50), outline=(212, 175, 55), width=2)
+    d.text((CX, y + bh // 2 + py), brand_txt, fill=(240, 215, 140), font=f_brand, anchor="mm")
+    y += bh + py * 2 + 45
 
+    # 2. Hook Card: "STOP SAYING: '<PHRASE>'"
+    ph = it.get("phrase", "")
     if ph:
-        pt=ph.upper(); pfs=36; pf=lf(FB,pfs); pw=d.textbbox((0,0),pt,font=pf)[2]
-        while pw>CW-40 and pfs>20: pfs-=2; pf=lf(FB,pfs); pw=d.textbbox((0,0),pt,font=pf)[2]
-        pb=d.textbbox((0,0),pt,font=pf); pw=pb[2]-pb[0]; ph2=pb[3]-pb[1]
-        d.rounded_rectangle([(CX-pw//2-12,y),(CX+pw//2+12,y+ph2+18)],radius=10,fill=(90,70,130))
-        d.text((CX,y+ph2//2+9),pt,fill=(255,255,255),font=pf,anchor="mm")
-        y+=ph2+60
+        hook_pill = f"STOP SAYING: \"{ph.upper()}\""
+        hook_fs = 36
+        f_hook = lf(FB, hook_fs)
+        hb = d.textbbox((0, 0), hook_pill, font=f_hook)
+        hw = hb[2] - hb[0]
+        while hw > CW - 70 and hook_fs > 22:
+            hook_fs -= 2
+            f_hook = lf(FB, hook_fs)
+            hb = d.textbbox((0, 0), hook_pill, font=f_hook)
+            hw = hb[2] - hb[0]
+        hh = hb[3] - hb[1]
+        h_pad = 20
+        d.rounded_rectangle([(CX - hw // 2 - 28, y), (CX + hw // 2 + 28, y + hh + h_pad * 2)], radius=16, fill=(45, 20, 30), outline=(220, 80, 90), width=2)
+        d.text((CX, y + hh // 2 + h_pad), hook_pill, fill=(255, 190, 195), font=f_hook, anchor="mm")
+        y += hh + h_pad * 2 + 35
 
-    pt2="VOCABULARY"
-    pb2=d.textbbox((0,0),pt2,font=fp); pw2=pb2[2]-pb2[0]; ph3=pb2[3]-pb2[1]
-    d.rounded_rectangle([(CX-pw2//2-22,y),(CX+pw2//2+22,y+ph3+22)],radius=12,fill=(75,55,115))
-    d.text((CX,y+ph3//2+11),pt2,fill=(255,245,140),font=fp,anchor="mm")
-    y+=ph3+70
+    # 3. Transition Sub-hook
+    trans_txt = "—  USE THIS 1-WORD UPGRADE INSTEAD  —"
+    d.text((CX, y), trans_txt, fill=(212, 175, 55), font=lf(FB, 28), anchor="mm")
+    y += 50
 
-    d.text((MX,y),"MEANING",fill=L,font=fdl,anchor="lm"); y+=60
-    dl=wt(d,df,fd,CW-70)
-    while len(dl)>2 and fd.size>36: fd=lf(FR,fd.size-4); dl=wt(d,df,fd,CW-70)
-    lh=d.textbbox((0,0),"A",font=fd)[3]-d.textbbox((0,0),"A",font=fd)[1]
-    ls=int(lh*1.5); th=(len(dl)-1)*ls+lh; pd=45; bh=th+pd*2
-    box=Image.new('RGBA',(CW,bh),DB+(255,)); bd=ImageDraw.Draw(box)
-    bd.rounded_rectangle([(0,0),(CW,bh)],radius=18,fill=DB+(255,))
-    for i,line in enumerate(dl): bd.text((CW//2,pd+(i*ls)+lh//2),line,fill=(255,255,255),font=fd,anchor="mm")
-    img.paste(box,(MX,y),box); y+=bh+65
+    # 4. Main Word Hero Card (Glassmorphic)
+    word_str = it["word"].upper()
+    wf_size = 125
+    wf = lf(FB, wf_size)
+    ww = d.textbbox((0, 0), word_str, font=wf)[2] - d.textbbox((0, 0), word_str, font=wf)[0]
+    while ww > CW - 60 and wf_size > 55:
+        wf_size -= 5
+        wf = lf(FB, wf_size)
+        ww = d.textbbox((0, 0), word_str, font=wf)[2] - d.textbbox((0, 0), word_str, font=wf)[0]
 
-    d.text((MX,y),"EXAMPLE",fill=L,font=fel,anchor="lm"); y+=60
-    el=wt(d,ex,fe,CW-70)
-    while len(el)>2 and fe.size>30: fe=lf(FR,fe.size-4); el=wt(d,ex,fe,CW-70)
-    elh=d.textbbox((0,0),"A",font=fe)[3]-d.textbbox((0,0),"A",font=fe)[1]
-    els=int(elh*1.5); eth=(len(el)-1)*els+elh; epd=40; ebh=eth+epd*2
-    ebox=Image.new('RGBA',(CW,ebh),EB+(220,)); ed=ImageDraw.Draw(ebox)
-    ed.rounded_rectangle([(0,0),(CW,ebh)],radius=15,fill=EB+(220,))
-    for i,line in enumerate(el): ed.text((CW//2,epd+(i*els)+elh//2),line,fill=(255,255,255),font=fe,anchor="mm")
-    img.paste(ebox,(MX,y),ebox); y+=ebh+65
+    wh = d.textbbox((0, 0), word_str, font=wf)[3] - d.textbbox((0, 0), word_str, font=wf)[1]
+    hero_h = wh + 120
+    card_hero = Image.new("RGBA", (CW, hero_h), (25, 30, 48, 220))
+    cd = ImageDraw.Draw(card_hero)
+    cd.rounded_rectangle([(0, 0), (CW, hero_h)], radius=24, fill=(25, 30, 48, 220), outline=(212, 175, 55), width=3)
+    cd.text((CW // 2, hero_h // 2 - 20), word_str, fill=(255, 255, 255), font=wf, anchor="mm")
+    pos_val = it.get("part_of_speech") or "vocabulary"
+    pos_str = f"•  {pos_val.upper()}  •"
+    cd.text((CW // 2, hero_h - 35), pos_str, fill=(212, 175, 55), font=f_sub, anchor="mm")
+    img.paste(card_hero.convert("RGB"), (MX, y), card_hero)
+    y += hero_h + 40
 
-    if tp and y<H2-180:
-        d.text((MX,y),"TIP",fill=(110,75,55),font=ftl,anchor="lm"); y+=55
-        tl=wt(d,tp,ft,CW-70)
-        while len(tl)>2 and ft.size>28: ft=lf(FR,ft.size-4); tl=wt(d,tp,ft,CW-70)
-        tlh=d.textbbox((0,0),"A",font=ft)[3]-d.textbbox((0,0),"A",font=ft)[1]
-        tls=int(tlh*1.5); tth=(len(tl)-1)*tls+tlh; tpd=35; tbh=tth+tpd*2
-        tbox=Image.new('RGBA',(CW,tbh),(255,210,160,200)); td=ImageDraw.Draw(tbox)
-        td.rounded_rectangle([(0,0),(CW,tbh)],radius=14,fill=(255,210,160,200))
-        for i,line in enumerate(tl): td.text((CW//2,tpd+(i*tls)+tlh//2),line,fill=(70,45,25),font=ft,anchor="mm")
-        img.paste(tbox,(MX,y),tbox)
+    # 5. Definition Card
+    df = it.get("definition", "")
+    lines_def = wt(d, df, f_body, CW - 80)
+    while len(lines_def) > 3 and f_body.size > 36:
+        f_body = lf(FR, f_body.size - 4)
+        lines_def = wt(d, df, f_body, CW - 80)
+    lh = d.textbbox((0, 0), "Ag", font=f_body)[3] - d.textbbox((0, 0), "Ag", font=f_body)[1]
+    bh1 = 70 + len(lines_def) * int(lh * 1.45) + 25
+    c1 = Image.new("RGBA", (CW, bh1), (20, 24, 38, 230))
+    c1d = ImageDraw.Draw(c1)
+    c1d.rounded_rectangle([(0, 0), (CW, bh1)], radius=18, fill=(20, 24, 38, 230), outline=(50, 60, 90), width=2)
+    c1d.text((40, 35), "DEFINITION", fill=(212, 175, 55), font=f_lbl, anchor="lm")
+    cy1 = 85
+    for line in lines_def:
+        c1d.text((40, cy1), line, fill=(245, 245, 250), font=f_body, anchor="lt")
+        cy1 += int(lh * 1.45)
+    img.paste(c1.convert("RGB"), (MX, y), c1)
+    y += bh1 + 35
 
-    d.rectangle([(0,H2-65),(W,H2)],fill=F2)
-    d.text((CX,H2-32),f"Power words daily  |  {CN}",fill=(210,200,220),font=ff,anchor="mm")
-    img=img.convert('RGB')
-    Path(op).parent.mkdir(parents=True,exist_ok=True); img.save(op,quality=96,optimize=True)
+    # 6. Example Sentence Card
+    ex = it.get("example", "")
+    ex_quoted = f"\"{ex}\"" if ex and not ex.startswith('"') else (ex or "")
+    lines_ex = wt(d, ex_quoted, f_quote, CW - 80)
+    while len(lines_ex) > 3 and f_quote.size > 34:
+        f_quote = lf(FI, f_quote.size - 4)
+        lines_ex = wt(d, ex_quoted, f_quote, CW - 80)
+    lh2 = d.textbbox((0, 0), "Ag", font=f_quote)[3] - d.textbbox((0, 0), "Ag", font=f_quote)[1]
+    bh2 = 70 + len(lines_ex) * int(lh2 * 1.45) + 25
+    c2 = Image.new("RGBA", (CW, bh2), (20, 24, 38, 230))
+    c2d = ImageDraw.Draw(c2)
+    c2d.rounded_rectangle([(0, 0), (CW, bh2)], radius=18, fill=(20, 24, 38, 230), outline=(50, 60, 90), width=2)
+    c2d.text((40, 35), "IN A SENTENCE", fill=(140, 195, 255), font=f_lbl, anchor="lm")
+    cy2 = 85
+    for line in lines_ex:
+        c2d.text((40, cy2), line, fill=(225, 235, 250), font=f_quote, anchor="lt")
+        cy2 += int(lh2 * 1.45)
+    img.paste(c2.convert("RGB"), (MX, y), c2)
+    y += bh2 + 35
+
+    # 7. Memory Trick Card
+    tp = it.get("tip", "")
+    if tp and y < H2 - 200:
+        lines_tip = wt(d, tp, f_tip, CW - 80)
+        while len(lines_tip) > 3 and f_tip.size > 30:
+            f_tip = lf(FR, f_tip.size - 4)
+            lines_tip = wt(d, tp, f_tip, CW - 80)
+        lh3 = d.textbbox((0, 0), "Ag", font=f_tip)[3] - d.textbbox((0, 0), "Ag", font=f_tip)[1]
+        bh3 = 65 + len(lines_tip) * int(lh3 * 1.45) + 25
+        c3 = Image.new("RGBA", (CW, bh3), (35, 30, 20, 230))
+        c3d = ImageDraw.Draw(c3)
+        c3d.rounded_rectangle([(0, 0), (CW, bh3)], radius=18, fill=(35, 30, 20, 230), outline=(212, 175, 55), width=2)
+        c3d.text((40, 32), "MEMORY TRICK", fill=(255, 215, 110), font=f_lbl, anchor="lm")
+        cy3 = 78
+        for line in lines_tip:
+            c3d.text((40, cy3), line, fill=(250, 240, 220), font=f_tip, anchor="lt")
+            cy3 += int(lh3 * 1.45)
+        img.paste(c3.convert("RGB"), (MX, y), c3)
+
+    # 8. Footer
+    d.line([(MX, H2 - 85), (W - MX, H2 - 85)], fill=(50, 60, 90), width=1)
+    footer_handle = CN.lower().replace(' ', '')
+    d.text((CX, H2 - 45), f"Save & Follow for Daily Power Words  •  @{footer_handle}", fill=(160, 175, 205), font=f_foot, anchor="mm")
+
+    img = img.convert('RGB')
+    Path(op).parent.mkdir(parents=True, exist_ok=True)
+    img.save(op, quality=96, optimize=True)
     print(f"[image] {Path(op).name}")
     return op
 
