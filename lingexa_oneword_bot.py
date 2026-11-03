@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 if sys.platform=="win32": sys.stdout.reconfigure(encoding="utf-8")
 load_dotenv()
 P=os.getenv("POLLINATIONS_API_KEY", "")
-M=os.getenv("AI_MODEL", "gemini-fast")
+M=os.getenv("AI_MODEL", "openai/gpt-5.4-nano")
 B=Path(__file__).parent; O=B/"output"; V=O/"video"; H=O/"history"
 for d in[O,V,H]: d.mkdir(exist_ok=True)
 W=1080; H2=1920; F=30; TV="en-US-GuyNeural"; CN="Lingexa One Word"; WPV=3; HF=H/"all_words.json"; FD=B/"fonts"
@@ -197,7 +197,7 @@ REQUIREMENTS:
 Return ONLY the raw JSON array."""
 
             payload = {
-                "model": M or "gemini-fast",
+                "model": M or "openai/gpt-5.4-nano",
                 "messages": [
                     {"role": "system", "content": "You are a master English lexicographer. Return ONLY valid JSON arrays of unique vocabulary."},
                     {"role": "user", "content": p}
