@@ -1283,7 +1283,10 @@
     "gyrfalconry",
     "overwhelm",
     "ravage",
-    "purge"
+    "purge",
+    "terraform",
+    "metasystem",
+    "singularize"
   ],
-  "last_updated": "2026-11-15T22:29:29.059642"
+  "last_updated": "2026-11-16T09:17:46.605802"
 }
